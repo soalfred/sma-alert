@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SMA 5·10·20 Alert Monitor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1220; --panel: #121a30; --line: #222c4a; --line2: #2a3350;
+    --text: #e8ecf4; --muted: #9aa6c4; --faint: #7b86a3; --dim: #5d6783;
+    --blue: #5b88f7; --green: #34d399; --red: #fb7185; --amber: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif; padding: 28px 20px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  .header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .eyebrow { font-size: 11px; letter-spacing: .22em; color: var(--blue); text-transform: uppercase; margin-bottom: 4px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 700; }
+  .controls { display: flex; gap: 8px; align-items: center; }
+  input#ticker {
+    width: 92px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line2);
+    background: #141b30; color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 16px; font-weight: 700; text-align: center; outline: none;
+  }
+  button { cursor: pointer; font-family: inherit; }
+  .btn-primary { padding: 10px 16px; border-radius: 10px; border: none; background: var(--blue); color: #fff; font-weight: 600; font-size: 14px; }
+  .btn-primary:disabled { background: var(--line2); cursor: wait; }
+  .btn-ghost { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line2); background: transparent; color: var(--muted); font-size: 14px; }
+  .banner {
+    display: none; flex-wrap: wrap; gap: 14px; align-items: center;
+    padding: 16px 18px; border-radius: 14px; margin-bottom: 16px;
+  }
+  .banner.on { background: linear-gradient(90deg, rgba(16,185,129,.18), rgba(16,185,129,.06)); border: 1px solid rgba(16,185,129,.5); }
+  .banner.off { background: linear-gradient(90deg, rgba(244,63,94,.14), rgba(244,63,94,.04)); border: 1px solid rgba(244,63,94,.35); }
+  .dot { width: 14px; height: 14px; border-radius: 50%; }
+  .banner.on .dot { background: var(--green); box-shadow: 0 0 14px var(--green); animation: pulse 1.4s infinite; }
+  .banner.off .dot { background: var(--red); }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: .7; } }
+  @media (prefers-reduced-motion: reduce) { .banner.on .dot { animation: none; } }
+  .banner-main { flex: 1; min-width: 220px; }
+  .banner-title { font-weight: 700; font-size: 17px; }
+  .banner-sub { font-size: 13px; color: var(--muted); }
+  .price-label { font-size: 11px; letter-spacing: .12em; color: #8b93a7; text-transform: uppercase; }
+  .price-value { font-family: ui-monospace, monospace; font-size: 28px; font-weight: 700; }
+  .sma-grid { display: none; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .sma-card { display: flex; align-items: baseline; justify-content: space-between; padding: 10px 14px; border-radius: 10px; }
+  .sma-card.above { background: rgba(16,185,129,.10); border: 1px solid rgba(16,185,129,.35); }
+  .sma-card.below { background: rgba(244,63,94,.08); border: 1px solid rgba(244,63,94,.25); }
+  .sma-label { font-size: 11px; letter-spacing: .12em; color: #8b93a7; text-transform: uppercase; }
+  .sma-value { font-family: ui-monospace, monospace; font-size: 20px; }
+  .sma-delta { font-family: ui-monospace, monospace; font-size: 13px; font-weight: 600; }
+  .sma-card.above .sma-delta { color: var(--green); }
+  .sma-card.below .sma-delta { color: var(--red); }
+  .chart-panel { display: none; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 12px 10px; margin-bottom: 16px; }
+  .options { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 14px; font-size: 14px; color: var(--muted); }
+  .options label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  select { background: #141b30; color: var(--text); border: 1px solid var(--line2); border-radius: 8px; padding: 6px 8px; font-family: inherit; }
+  .link-btn { background: transparent; border: none; color: var(--blue); font-size: 14px; text-decoration: underline; padding: 0; }
+  .stamp { margin-left: auto; font-size: 12px; }
+  .paste-panel { display: none; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .paste-help { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  textarea {
+    width: 100%; min-height: 90px; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line2); border-radius: 10px; padding: 10px;
+    font-family: ui-monospace, monospace; font-size: 13px;
+  }
+  .msg { display: none; padding: 12px 16px; border-radius: 10px; font-size: 14px; margin-bottom: 14px;
+         background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.35); color: var(--amber); }
+  .empty { padding: 26px; text-align: center; color: var(--faint); border: 1px dashed var(--line2); border-radius: 14px; }
+  .log-title { font-size: 11px; letter-spacing: .12em; color: #8b93a7; text-transform: uppercase; margin: 6px 0; }
+  .log-entry { font-family: ui-monospace, monospace; font-size: 13px; color: var(--green); padding: 3px 0; }
+  .footer { margin-top: 22px; font-size: 12px; color: var(--dim); }
+  input:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div>
+      <div class="eyebrow">Moving-average signal monitor</div>
+      <h1>Price vs SMA 5 · 10 · 20</h1>
+    </div>
+    <div class="controls">
+      <input id="ticker" value="SOXL" maxlength="6" aria-label="Ticker symbol" />
+      <button id="checkBtn" class="btn-primary">Check now</button>
+      <button id="demoBtn" class="btn-ghost">Demo data</button>
+    </div>
+  </div>
+
+  <div id="banner" class="banner off" role="status">
+    <div class="dot"></div>
+    <div class="banner-main">
+      <div class="banner-title" id="bannerTitle"></div>
+      <div class="banner-sub" id="bannerSub"></div>
+    </div>
+    <div style="text-align:right">
+      <div class="price-label" id="priceLabel">Live price</div>
+      <div class="price-value" id="priceValue">—</div>
+    </div>
+  </div>
+
+  <div id="smaGrid" class="sma-grid"></div>
+
+  <div id="chartPanel" class="chart-panel">
+    <canvas id="chart" height="120"></canvas>
+  </div>
+
+  <div class="options">
+    <label><input type="checkbox" id="soundToggle" checked /> Sound on alert</label>
+    <label>Auto-check:
+      <select id="autoSelect">
+        <option value="0">off</option>
+        <option value="5">every 5 min</option>
+        <option value="15">every 15 min</option>
+        <option value="60">hourly</option>
+      </select>
+    </label>
+    <button id="pasteToggle" class="link-btn">Paste prices manually</button>
+    <span class="stamp" id="stamp"></span>
+  </div>
+
+  <div id="pastePanel" class="paste-panel">
+    <div class="paste-help">Paste at least 20 daily closing prices, <strong>oldest first</strong>, separated by spaces, commas, or new lines. The last value is treated as the current price.</div>
+    <textarea id="pasteText" placeholder="18.42, 18.91, 18.77, 19.35, …"></textarea>
+    <button id="pasteLoad" class="btn-primary" style="margin-top:8px">Load prices</button>
+  </div>
+
+  <div id="msg" class="msg"></div>
+  <div id="empty" class="empty">
+    No data yet. Press <strong style="color:var(--text)">Check now</strong> to fetch from Yahoo Finance, try <strong style="color:var(--text)">Demo data</strong>, or paste prices manually.
+  </div>
+
+  <div id="logWrap" style="display:none">
+    <div class="log-title">Alert log</div>
+    <div id="log"></div>
+  </div>
+
+  <div class="footer">
+    Educational tool, not investment advice. Live data comes from Yahoo Finance's public chart endpoint (via a CORS relay since this is a static page) and may lag or differ slightly from your broker's feed.
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- state ----------
+  let series = [];        // [{date:'YYYY-MM-DD', close:Number}] oldest → newest
+  let livePrice = null;   // regularMarketPrice when available
+  let prevAbove = null;
+  let timer = null;
+  let chart = null;
+  const logEntries = [];
+
+  const $ = (id) => document.getElementById(id);
+  const fmt = (v) => (v == null ? "—" : "$" + v.toFixed(2));
+
+  // ---------- math ----------
+  function sma(closes, n) {
+    if (closes.length < n) return null;
+    let s = 0;
+    for (let i = closes.length - n; i < closes.length; i++) s += closes[i];
+    return s / n;
+  }
+
+  // ---------- sound ----------
+  function beep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 880;
+      g.gain.setValueAtTime(0.18, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.55);
+      o.start(); o.stop(ctx.currentTime + 0.55);
+    } catch (e) { /* audio unavailable */ }
+  }
+
+  // ---------- Yahoo Finance fetch ----------
+  // Yahoo's chart API has no CORS headers, so on a static GitHub Pages site
+  // we route through public CORS relays, trying several in order.
+  function yahooUrl(tkr) {
+    return "https://query1.finance.yahoo.com/v8/finance/chart/" +
+      encodeURIComponent(tkr) + "?range=3mo&interval=1d";
+  }
+  const PROXIES = [
+    (u) => "https://corsproxy.io/?url=" + encodeURIComponent(u),
+    (u) => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
+    (u) => u, // direct, in case the browser/context allows it
+  ];
+
+  async function fetchYahoo(tkr) {
+    const target = yahooUrl(tkr);
+    let lastErr = null;
+    for (const wrap of PROXIES) {
+      try {
+        const res = await fetch(wrap(target), { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        const result = data && data.chart && data.chart.result && data.chart.result[0];
+        if (!result) throw new Error(data && data.chart && data.chart.error ? data.chart.error.description : "empty result");
+        const ts = result.timestamp || [];
+        const closes = (result.indicators.quote[0].close || []);
+        const rows = [];
+        for (let i = 0; i < ts.length; i++) {
+          if (closes[i] != null) {
+            rows.push({ date: new Date(ts[i] * 1000).toISOString().slice(0, 10), close: closes[i] });
+          }
+        }
+        if (rows.length < 20) throw new Error("not enough history");
+        return { rows: rows.slice(-40), live: result.meta && result.meta.regularMarketPrice || null };
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error("all sources failed");
+  }
+
+  // ---------- demo ----------
+  const DEMO_CLOSES = [18.42,18.91,18.77,19.35,19.02,18.64,19.21,19.88,20.14,19.76,
+                       20.42,20.95,20.61,21.30,21.08,20.74,21.55,22.12,21.89,22.47,
+                       22.21,22.86,23.04,22.71,23.39];
+  function demoSeries() {
+    const today = new Date();
+    return DEMO_CLOSES.map((c, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (DEMO_CLOSES.length - i));
+      return { date: d.toISOString().slice(0, 10), close: c };
+    });
+  }
+
+  // ---------- render ----------
+  function render() {
+    const closes = series.map((p) => p.close);
+    const price = livePrice != null ? livePrice : (closes.length ? closes[closes.length - 1] : null);
+    const s5 = sma(closes, 5), s10 = sma(closes, 10), s20 = sma(closes, 20);
+    const ready = price != null && s20 != null;
+    const tkr = $("ticker").value.toUpperCase();
+
+    $("empty").style.display = series.length ? "none" : "block";
+
+    const banner = $("banner");
+    const grid = $("smaGrid");
+    if (!ready) { banner.style.display = "none"; grid.style.display = "none"; }
+    else {
+      const aboveAll = price > s5 && price > s10 && price > s20;
+      banner.style.display = "flex";
+      banner.className = "banner " + (aboveAll ? "on" : "off");
+      $("bannerTitle").textContent = aboveAll
+        ? "\uD83D\uDD14 ALERT — " + tkr + " is above all three moving averages"
+        : tkr + " is not above all three moving averages";
+      $("bannerSub").textContent = aboveAll
+        ? "Bullish alignment: price exceeds SMA 5, 10 and 20."
+        : "Alert fires only when price exceeds SMA 5, 10 and 20 at once.";
+      $("priceLabel").textContent = livePrice != null ? "Live price" : "Last close";
+      $("priceValue").textContent = fmt(price);
+
+      grid.style.display = "grid";
+      grid.innerHTML = "";
+      [["SMA 5", s5], ["SMA 10", s10], ["SMA 20", s20]].forEach(function (pair) {
+        const above = price > pair[1];
+        const pct = ((price - pair[1]) / pair[1] * 100);
+        const card = document.createElement("div");
+        card.className = "sma-card " + (above ? "above" : "below");
+        card.innerHTML =
+          '<div><div class="sma-label">' + pair[0] + '</div>' +
+          '<div class="sma-value">' + fmt(pair[1]) + '</div></div>' +
+          '<div class="sma-delta">' + (above ? "\u25B2 +" : "\u25BC ") + pct.toFixed(2) + "%</div>";
+        grid.appendChild(card);
+      });
+
+      // alert on transition into "above all"
+      if (aboveAll && prevAbove !== true) {
+        if ($("soundToggle").checked) beep();
+        logEntries.unshift(new Date().toLocaleTimeString() + " — " + tkr + " " + fmt(price) + " crossed above SMA 5/10/20");
+        if (logEntries.length > 12) logEntries.pop();
+        $("logWrap").style.display = "block";
+        $("log").innerHTML = logEntries.map((l) => '<div class="log-entry">' + l + "</div>").join("");
+      }
+      prevAbove = ready ? aboveAll : null;
+    }
+    renderChart(closes);
+  }
+
+  function renderChart(closes) {
+    const panel = $("chartPanel");
+    if (!series.length) { panel.style.display = "none"; return; }
+    panel.style.display = "block";
+    const labels = series.map((p) => p.date.slice(5));
+    const roll = (n) => series.map((_, i) => sma(closes.slice(0, i + 1), n));
+    const ds = [
+      { label: "Close",  data: closes,   borderColor: "#e8ecf4", borderWidth: 2.2 },
+      { label: "SMA 5",  data: roll(5),  borderColor: "#34d399", borderWidth: 1.6 },
+      { label: "SMA 10", data: roll(10), borderColor: "#fbbf24", borderWidth: 1.6 },
+      { label: "SMA 20", data: roll(20), borderColor: "#fb7185", borderWidth: 1.6 },
+    ].map((d) => Object.assign(d, { pointRadius: 0, tension: 0.25, spanGaps: false }));
+
+    if (chart) {
+      chart.data.labels = labels;
+      chart.data.datasets.forEach((d, i) => { d.data = ds[i].data; });
+      chart.update();
+      return;
+    }
+    chart = new Chart($("chart"), {
+      type: "line",
+      data: { labels: labels, datasets: ds },
+      options: {
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { labels: { color: "#9aa6c4", boxWidth: 18, font: { size: 11 } } },
+          tooltip: {
+            backgroundColor: "#0d1220", borderColor: "#2a3350", borderWidth: 1,
+            callbacks: { label: (c) => c.dataset.label + ": " + (c.parsed.y == null ? "—" : "$" + c.parsed.y.toFixed(2)) },
+          },
+        },
+        scales: {
+          x: { ticks: { color: "#7b86a3", font: { size: 10 }, maxTicksLimit: 12 }, grid: { display: false } },
+          y: { ticks: { color: "#7b86a3", font: { size: 10 } }, grid: { color: "#1d2742" } },
+        },
+      },
+    });
+  }
+
+  // ---------- UI plumbing ----------
+  function showMsg(text) { const m = $("msg"); m.textContent = text; m.style.display = "block"; }
+  function hideMsg() { $("msg").style.display = "none"; }
+  function stamp() { $("stamp").textContent = "Last checked " + new Date().toLocaleTimeString(); }
+
+  async function check() {
+    const btn = $("checkBtn");
+    btn.disabled = true; btn.textContent = "Fetching…"; hideMsg();
+    try {
+      const tkr = $("ticker").value.trim().toUpperCase() || "SOXL";
+      const out = await fetchYahoo(tkr);
+      series = out.rows; livePrice = out.live;
+      stamp(); render();
+    } catch (e) {
+      showMsg("Couldn't reach Yahoo Finance (the CORS relays may be busy, or the ticker wasn't found). Try again in a moment, or paste closing prices manually.");
+    } finally {
+      btn.disabled = false; btn.textContent = "Check now";
+    }
+  }
+
+  $("checkBtn").addEventListener("click", check);
+  $("ticker").addEventListener("keydown", (e) => { if (e.key === "Enter") check(); });
+  $("ticker").addEventListener("input", function () { this.value = this.value.toUpperCase(); prevAbove = null; });
+
+  $("demoBtn").addEventListener("click", function () {
+    series = demoSeries(); livePrice = null; prevAbove = null;
+    hideMsg(); stamp(); render();
+  });
+
+  $("pasteToggle").addEventListener("click", function () {
+    const p = $("pastePanel");
+    const open = p.style.display === "block";
+    p.style.display = open ? "none" : "block";
+    this.textContent = open ? "Paste prices manually" : "Hide manual entry";
+  });
+
+  $("pasteLoad").addEventListener("click", function () {
+    const nums = $("pasteText").value.split(/[\s,;]+/).map(parseFloat).filter((n) => !isNaN(n) && n > 0);
+    if (nums.length < 20) { showMsg("Found only " + nums.length + " prices — need at least 20 (oldest first)."); return; }
+    const today = new Date();
+    series = nums.slice(-60).map(function (c, i, arr) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (arr.length - 1 - i));
+      return { date: d.toISOString().slice(0, 10), close: c };
+    });
+    livePrice = null; prevAbove = null;
+    hideMsg(); stamp(); render();
+    $("pastePanel").style.display = "none";
+    $("pasteToggle").textContent = "Paste prices manually";
+  });
+
+  $("autoSelect").addEventListener("change", function () {
+    if (timer) clearInterval(timer);
+    const mins = Number(this.value);
+    if (mins > 0) timer = setInterval(check, mins * 60 * 1000);
+  });
+})();
+</script>
+</body>
+</html>
