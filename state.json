@@ -1,7 +1,7 @@
 {
   "COHR": {
     "above_all": false,
-    "checked_at": "2026-07-13 20:34 UTC",
+    "checked_at": "2026-07-13 21:36 UTC",
     "price": 307.39,
     "sma10": 341.371,
     "sma20": 367.541,
@@ -9,7 +9,7 @@
   },
   "LITE": {
     "above_all": false,
-    "checked_at": "2026-07-13 20:34 UTC",
+    "checked_at": "2026-07-13 21:36 UTC",
     "price": 768.15,
     "sma10": 773.213,
     "sma20": 822.48,
@@ -17,7 +17,7 @@
   },
   "MU": {
     "above_all": false,
-    "checked_at": "2026-07-13 20:34 UTC",
+    "checked_at": "2026-07-13 21:36 UTC",
     "price": 937.0,
     "sma10": 1008.728,
     "sma20": 1050.6185,
@@ -25,7 +25,7 @@
   },
   "SNDK": {
     "above_all": false,
-    "checked_at": "2026-07-13 20:34 UTC",
+    "checked_at": "2026-07-13 21:36 UTC",
     "price": 1673.97,
     "sma10": 1863.881,
     "sma20": 1971.9685,
@@ -33,7 +33,7 @@
   },
   "SOXL": {
     "above_all": false,
-    "checked_at": "2026-07-13 20:34 UTC",
+    "checked_at": "2026-07-13 21:36 UTC",
     "price": 165.37,
     "sma10": 198.708,
     "sma20": 223.1785,
